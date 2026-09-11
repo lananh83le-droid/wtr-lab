@@ -1,0 +1,37 @@
+{
+  "summary": "Full backend + frontend testing of WTR-Lab crawler. 13/13 pytest cases pass (root, stats, crawl status, start/pause, settings, proxies CRUD, logs, enumerate, add novel, novel get/list, chapter crawl progress, chapter content with Chinese, export txt/json). Frontend Playwright end-to-end covers Dashboard, global toggle, enumerate, Novels tab add + row + view drawer + Chinese text in raw-viewer, Proxy add/delete, Settings save, Logs. Novel 97812 reached 15 done chapters with Chinese text; status=partial (expected due to Turnstile rate limit).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "chapter crawl error handling", "issue": "Turnstile-blocked chapters are being marked status=error and logged as ERROR (41 errors), but crawler.RATE_MARKERS logic intends to keep them as 'pending' silently. Likely because httpx.raise_for_status() throws before the JSON success=false check, so the exception message does not contain 'turnstile'/'challenge'. Consider inspecting response body before raise_for_status, or extending RATE_MARKERS to include HTTP status codes (403/503) / 'forbidden'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_crawler_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Improve rate-limit detection in crawler.py so Turnstile blocks stay 'pending' instead of 'error'/ERROR log — matches stated design and avoids noisy logs. Not blocking; success criteria met."
+  ],
+  "critical_code_review_comments": [
+    "wtrlab.get_chapter: r.raise_for_status() runs before checking JSON body. If Turnstile returns non-2xx, HTTPStatusError message lacks 'turnstile' so RATE_MARKERS miss and chapters get status=error. Read body first or check for 403/429 in markers.",
+    "server.py exports write file to /app/exports every call — fine for MVP but could accumulate. Consider streaming response instead.",
+    "server.py uses deprecated @app.on_event('startup'/'shutdown'); consider lifespan handlers (FastAPI >=0.93).",
+    "crawler.CrawlManager.enumerate_all does NOT await asyncio.create_task, fine; but no lock — concurrent /api/crawl/enumerate can race the running flag (has guard in endpoint though)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_crawler_api.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "Novel source_id=97812 (Tokyo Ghoul re Zero) queued and crawled to 15 done chapters with raw Chinese body; test proxies were created and deleted within tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression test at /app/backend/tests/test_crawler_api.py — reuses public REACT_APP_BACKEND_URL. All flows verified end-to-end including AES-GCM decrypted Chinese content in export files. Turnstile rate limit is expected and does not fail criteria."
+}

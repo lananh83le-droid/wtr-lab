@@ -1,0 +1,121 @@
+{
+  "app_title": "WTR-Lab Crawler Operations Control Center",
+  "app_type": "dashboard",
+  "language": "Vietnamese",
+  "theme": "Dark Terminal Ops / Swiss Precision Hybrid",
+  "target_audience": "Scraping Engineers & Content Ops Admin",
+  "colors": {
+    "background": "#0B0F17",
+    "surface": "#111827",
+    "surface_elevated": "#1F2937",
+    "border": "rgba(255, 255, 255, 0.08)",
+    "border_highlight": "rgba(255, 255, 255, 0.18)",
+    "primary": "#00F0FF",
+    "primary_hover": "#38F5FF",
+    "primary_muted": "rgba(0, 240, 255, 0.12)",
+    "secondary": "#8B5CF6",
+    "secondary_muted": "rgba(139, 92, 246, 0.15)",
+    "success": "#10B981",
+    "success_bg": "rgba(16, 185, 129, 0.12)",
+    "warning": "#F59E0B",
+    "warning_bg": "rgba(245, 158, 11, 0.12)",
+    "error": "#EF4444",
+    "error_bg": "rgba(239, 68, 68, 0.15)",
+    "text_primary": "#F9FAFB",
+    "text_secondary": "#9CA3AF",
+    "text_muted": "#6B7280",
+    "chinese_text_accent": "#F43F5E"
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "code_mono_font": "JetBrains Mono, Fira Code, monospace",
+    "h1": "text-2xl sm:text-3xl font-bold tracking-tight text-white",
+    "h2": "text-lg sm:text-xl font-semibold tracking-tight text-gray-100",
+    "h3": "text-base font-medium text-gray-200",
+    "body": "text-sm text-gray-300 leading-relaxed",
+    "caption": "text-xs font-mono text-gray-400 uppercase tracking-widest",
+    "chinese_preview": "font-serif text-base text-rose-200/90 leading-loose bg-black/40 p-4 rounded-md border border-rose-900/30"
+  },
+  "layout_strategy": {
+    "grid_mode": "MODE B: High Density Grid for Scraping Operations Dashboard",
+    "sidebar": "Fixed left rail 240px wide with logo, active status badge, core tabs (Tổng quan, Danh sách Truyện, Tiến độ Crawl, Quản lý Proxy, Nhật ký Lỗi, Cấu hình MongoDB), and live stats drawer",
+    "header": "Top status bar with wtr-lab.com connectivity status, MongoDB live connection state, Active Threads count, Global Start/Pause controls, and Export quick actions",
+    "main_container": "p-6 space-y-6 max-w-[1700px] mx-auto min-h-screen",
+    "card_style": "bg-gray-900/90 border border-gray-800 rounded-lg p-5 shadow-xl backdrop-blur-md hover:border-gray-700 transition-all duration-200"
+  },
+  "key_components": [
+    {
+      "name": "Global Stat Grid",
+      "purpose": "Displays Total Novels, Chapters Crawled, Throughput (caps/min), Queue Size, Active Proxy Workers, and Failed Items",
+      "design": "Compact cards with subtle cyan top border, mono stat values with auto-animating counter effects and mini sparkline/status dot"
+    },
+    {
+      "name": "Novel Discovery & Enumerate Bar",
+      "purpose": "Trigger enumeration of wtr-lab.com catalog with pagination/range input and live discovery socket logs",
+      "design": "Action-oriented toolbar with neon cyan CTA 'Quét Tất Cả Truyện (Enumerate All)' and progress modal"
+    },
+    {
+      "name": "Novel Queue Table",
+      "purpose": "Searchable, filterable table of discovered Chinese novels with cover preview, original title (Chinese), translated title (Vietnamese), author, total chapters, progress bar, crawl speed, status badges, and inline actions (Bắt đầu, Tạm dừng, Thử lại, Export)",
+      "design": "Dense data table with sticky headers, hover highlights, custom multi-color progress bars, and expandable row details"
+    },
+    {
+      "name": "Chapter Inspector & Raw Chinese Viewer",
+      "purpose": "Drawer/Modal to inspect crawled MongoDB chapters with raw Chinese text content, token count, crawl timestamp, and HTML selector validation",
+      "design": "Code editor style dual panel with Chinese text typography, chapter index tree, and copy/export options"
+    },
+    {
+      "name": "Proxy Pool Manager",
+      "purpose": "CRUD table for HTTP/SOCKS5 proxies with automated latency ping, success rate, target site block check, and toggle switch",
+      "design": "Status-coded matrix table with quick Add Proxy modal and batch test trigger"
+    },
+    {
+      "name": "Live Error Log Terminal",
+      "purpose": "Streaming logs of crawl failures (403 Cloudflare, 503 Timeout, Selector Mismatch) with one-click Auto-Retry Failed Queue button",
+      "design": "Dark terminal view with monospace font, color-coded severity tags (ERROR/WARN/RETRY), and search filter"
+    },
+    {
+      "name": "Export & MongoDB Manager Panel",
+      "purpose": "One-click export options (.txt format, .json format) per novel or full database dump with custom file naming patterns",
+      "design": "Interactive cards with download progress bars, storage quota charts, and path selection"
+    }
+  ],
+  "image_urls": {
+    "novel_covers": [
+      {
+        "url": "https://images.unsplash.com/photo-1689230053630-cb51e7b90fc1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxjaGluZXNlJTIwd2ViJTIwbm92ZWwlMjBib29rJTIwY292ZXIlMjBhcnR3b3JrfGVufDB8fHx8MTc4OTEwNTk2NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Chinese fantasy novel dragon illustration artwork"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1763210721716-caa2b0452d26?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwzfHxjaGluZXNlJTIwd2ViJTIwbm92ZWwlMjBib29rJTIwY292ZXIlMjBhcnR3b3JrfGVufDB8fHx8MTc4OTEwNTk2NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Asian novel aesthetics book cover"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1636262513938-2c8f93d16844?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxjaGluZXNlJTIwd2ViJTIwbm92ZWwlMjBib29rJTIwY292ZXIlMjBhcnR3b3JrfGVufDB8fHx8MTc4OTEwNTk2NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Wuxia/Xianxia web novel book stack preview"
+      }
+    ],
+    "system_textures": [
+      {
+        "url": "https://images.unsplash.com/photo-1759661881353-5b9cc55e1cf4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY6NzZ8MHwxfHNlYXJjaHwyfHxzZXJ2ZXIlMjBkYXRhJTIwZGFzaGJvYXJkJTIwbWF0cml4JTIwY3liZXIlMjBkYXJrfGVufDB8fHx8MTc4OTEwNTk2NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Server code and crawling telemetry backdrop"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure ALL UI strings are in Vietnamese (e.g. 'Bảng điều khiển', 'Quét danh sách truyện', 'Tiến độ thu thập', 'Quản lý Proxy', 'Xuất Tập Tin .TXT', 'Xuất Tập Tin .JSON', 'Thử lại lỗi', 'Trạng thái MongoDB').",
+    "Use Shadcn UI components heavily (Table, Dialog, Tabs, Badge, Progress, Select, Switch, Tooltip, Sonner toast).",
+    "Add explicit `data-testid` to all interactive buttons, inputs, tabs, table action items, and status indicators.",
+    "Do NOT use pure black background or default gray cards; use `#0B0F17` base and `#111827` cards with crisp `border-gray-800` borders.",
+    "Provide rich mock data for wtr-lab.com Chinese novels (e.g. 'Toàn Dân Lĩnh Chủ: Ngã Hữu Thần Cấp Trại Dược (全民领主：我有神级制药)', 'Đấu La Đại Lục V (斗罗大陆V)', 'Võ Luyện Đỉnh Phong (武炼巅峰)', etc.) with realistic chapter counts (500 - 3000 chapters) and MongoDB collection status.",
+    "Implement full interactive functionality in frontend: Start/Pause/Retry crawl simulation, proxy CRUD & connection test, chapter search & raw Chinese preview drawer, live speed toggles, export downloading trigger, and error filter.",
+    "Make progress bars highly visible with neon cyan/emerald fill gradients and animated stripe/pulse states when status is 'CRAWLING'.",
+    "Always set explicit hover text colors (e.g. `hover:bg-cyan-500/20 hover:text-cyan-300`). Never let hover contrast fail."
+  ],
+  "accessibility_and_testing": {
+    "contrast_ratio": "Minimum 4.5:1 for normal text, high contrast neon indicators",
+    "test_id_convention": "kebab-case data-testid on all elements (e.g., data-testid='crawl-start-all-btn', data-testid='novel-table-row-1', data-testid='export-json-btn')",
+    "reduced_motion": "Respect prefers-reduced-motion CSS directives for pulsing lights and progress bar animations"
+  }
+}
