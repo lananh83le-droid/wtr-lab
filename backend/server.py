@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import re
+import asyncio
 import json
 import uuid
 import zipfile
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
 
-import wtrlab
+import proxy_pool
 from crawler import CrawlManager, now_iso
 
 ROOT_DIR = Path(__file__).parent
@@ -53,6 +54,29 @@ class SettingsReq(BaseModel):
     concurrency: Optional[int] = None
     delay_ms: Optional[int] = None
     use_proxy: Optional[bool] = None
+    auto_scan_enabled: Optional[bool] = None
+    auto_scan_interval_min: Optional[int] = None
+    auto_scan_pages: Optional[int] = None
+    chapter_limit: Optional[int] = None
+    parallel_novels: Optional[int] = None
+    proxy_auto_harvest: Optional[bool] = None
+    proxy_max_pool: Optional[int] = None
+    proxy_kinds: Optional[list] = None
+
+
+class BulkProxyReq(BaseModel):
+    text: str
+    label: Optional[str] = ""
+    default_scheme: Optional[str] = "http"
+
+
+class HarvestReq(BaseModel):
+    kinds: Optional[list] = None
+    max_pool: Optional[int] = None
+
+
+class ScanNewReq(BaseModel):
+    pages: Optional[int] = None
 
 
 class QueueAllReq(BaseModel):
@@ -95,13 +119,22 @@ async def crawl_status():
         "throughput": manager.throughput(),
         "build_id": manager.build_id,
         "enumerate": manager.enum,
+        "auto_scan": {k: v for k, v in manager.auto_scan.items() if k != "next_run_ts"},
     }
+
+
+@api_router.post("/crawl/scan-new")
+async def crawl_scan_new(req: ScanNewReq):
+    if not await manager.scan_new_now(req.pages):
+        raise HTTPException(400, "Đang quét truyện mới rồi")
+    return {"started": True}
 
 
 @api_router.post("/crawl/start")
 async def crawl_start():
     manager.running = True
     manager.ensure_loop()
+    await db.settings.update_one({"id": "settings"}, {"$set": {"running": True}}, upsert=True)
     await manager.log("INFO", "Đã khởi động crawler")
     return {"running": True}
 
@@ -109,6 +142,7 @@ async def crawl_start():
 @api_router.post("/crawl/pause")
 async def crawl_pause():
     manager.running = False
+    await db.settings.update_one({"id": "settings"}, {"$set": {"running": False}}, upsert=True)
     await manager.log("INFO", "Đã tạm dừng crawler")
     return {"running": False}
 
@@ -269,18 +303,66 @@ async def get_chapter(chapter_id: str):
 # ---------------- proxies ----------------
 @api_router.get("/proxies")
 async def list_proxies():
-    return await db.proxies.find({}, {"_id": 0}).to_list(1000)
+    items = await db.proxies.find({}, {"_id": 0}).sort([("status", 1), ("latency", 1)]).to_list(5000)
+    return items
+
+
+@api_router.get("/proxies/summary")
+async def proxies_summary():
+    pipeline = [{"$group": {"_id": {"s": "$status", "e": "$enabled"}, "n": {"$sum": 1}}}]
+    total = alive = dead = enabled = 0
+    async for d in db.proxies.aggregate(pipeline):
+        n = d["n"]
+        total += n
+        if d["_id"]["s"] == "alive":
+            alive += n
+        if d["_id"]["s"] == "dead":
+            dead += n
+        if d["_id"]["e"]:
+            enabled += n
+    return {"total": total, "alive": alive, "dead": dead, "enabled": enabled,
+            "available": await manager.pool.available_count(), "harvest": manager.pool.harvest}
+
+
+@api_router.post("/proxies/bulk")
+async def bulk_proxies(req: BulkProxyReq):
+    res = await manager.pool.bulk_add(req.text, req.label or "", req.default_scheme or "http")
+    await manager.log("INFO", f"Nhập hàng loạt: thêm {res['added']} proxy, bỏ qua {res['skipped']} trùng")
+    return res
+
+
+@api_router.post("/proxies/harvest")
+async def harvest_proxies(req: HarvestReq):
+    s = await manager.get_settings()
+    kinds = req.kinds or s.get("proxy_kinds") or ["http", "socks5"]
+    max_pool = req.max_pool or s.get("proxy_max_pool") or 200
+    if not manager.pool.start_harvest(kinds, max_pool, manager.log):
+        raise HTTPException(400, "Đang thu thập proxy rồi")
+    await manager.log("INFO", f"Bắt đầu thu thập proxy miễn phí ({', '.join(kinds)}), tối đa {max_pool}")
+    return {"started": True}
+
+
+@api_router.post("/proxies/recheck")
+async def recheck_proxies():
+    asyncio.create_task(manager.pool.recheck_all(manager.log))
+    return {"started": True}
+
+
+@api_router.delete("/proxies/dead")
+async def purge_dead_proxies():
+    n = await manager.pool.purge_dead()
+    return {"deleted": n}
 
 
 @api_router.post("/proxies")
 async def add_proxy(req: ProxyReq):
-    doc = {
-        "id": str(uuid.uuid4()), "url": req.url.strip(), "label": req.label or "",
-        "enabled": True, "status": "unknown", "latency": None, "last_checked": None,
-        "created_at": now_iso(),
-    }
+    url = proxy_pool.parse_line(req.url) or req.url.strip()
+    if await db.proxies.find_one({"url": url}):
+        raise HTTPException(400, "Proxy đã tồn tại")
+    doc = proxy_pool.new_proxy_doc(url, req.label or "")
     await db.proxies.insert_one(doc)
     doc.pop("_id", None)
+    manager.pool._cache_ts = 0
     return doc
 
 
@@ -304,20 +386,14 @@ async def test_proxy(proxy_id: str):
     p = await db.proxies.find_one({"id": proxy_id}, {"_id": 0})
     if not p:
         raise HTTPException(404, "Không tìm thấy proxy")
-    import time as _t
     result = {"status": "dead", "latency": None}
-    try:
-        t0 = _t.time()
-        async with wtrlab.make_client(p["url"]) as c:
-            r = await c.get(f"{wtrlab.BASE}/en")
-            if r.status_code < 500:
-                result = {"status": "alive", "latency": int((_t.time() - t0) * 1000)}
-    except Exception as e:
-        result = {"status": "dead", "latency": None, "error": str(e)[:150]}
-    await db.proxies.update_one(
-        {"id": proxy_id},
-        {"$set": {"status": result["status"], "latency": result.get("latency"), "last_checked": now_iso()}},
-    )
+    lat = await proxy_pool.check_proxy(p["url"], timeout=12.0)
+    upd = {"status": "dead", "latency": None, "last_checked": now_iso()}
+    if lat is not None:
+        result = {"status": "alive", "latency": lat}
+        upd = {"status": "alive", "latency": lat, "last_checked": now_iso(), "fail_count": 0}
+    await db.proxies.update_one({"id": proxy_id}, {"$set": upd})
+    manager.pool._cache_ts = 0
     return result
 
 
@@ -437,6 +513,11 @@ async def _startup():
     await db.chapters.create_index("novel_id")
     await db.chapters.create_index([("novel_id", 1), ("status", 1)])
     await db.logs.create_index("created_at")
+    await db.proxies.create_index("url", unique=True)
+    await db.novels.update_many({"status": "crawling"}, {"$set": {"status": "queued"}})
+    await db.chapters.update_many({"status": "fetching"}, {"$set": {"status": "pending"}})
+    s = await db.settings.find_one({"id": "settings"}, {"_id": 0, "running": 1})
+    manager.running = bool(s and s.get("running"))
     manager.ensure_loop()
     logger.info("Crawler manager initialised")
 

@@ -1,0 +1,25 @@
+{
+  "summary": "Tested new 'Tự động quét truyện mới' feature end-to-end. Backend: 8/8 pytest cases in test_auto_scan.py pass — new settings fields (auto_scan_enabled/interval/pages/chapter_limit) exist with correct defaults, PUT persists, GET /api/crawl/status returns auto_scan object without next_run_ts, POST /api/crawl/scan-new starts scan + logs 'Quét truyện mới: phát hiện N truyện mới' within 40s, next_run populates within ~24s when enabled, existing chapter_limit-throttled novel shows total_chapters==chapter_limit and site_chapters>full TOC, regression endpoints OK. Frontend: AutoScanCard on Dashboard shows badge (TẮT→ĐANG BẬT), info line and Scan-now button — toast 'Bắt đầu quét truyện mới' fires. SettingsPanel has auto-scan-settings section with switch + 3 inputs + save button; changing them and saving persists after reload; Dashboard badge updates to 'ĐANG BẬT'. Settings restored to defaults (auto_scan_enabled=false, chapter_limit=0, auto_scan_pages=3, auto_scan_interval_min=60).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auto_scan.py",
+    "/app/backend/tests/test_crawler_api.py",
+    "/app/test_reports/pytest/pytest_auto_scan.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "crawler.get_settings inserts default doc with `id: 'settings'` but returns it including id — harmless. Settings model doesn't validate min/max ranges (e.g., auto_scan_interval_min<5 is silently clamped only in worker); UI clamps to >=5. Consider server-side validation via Pydantic Field(ge=5).",
+    "server.py PUT /api/settings only stores keys the client sends. If a client PUTs only auto_scan_enabled, other defaults are preserved (fine). But there's no auth on any endpoint — acceptable per requirements but noted.",
+    "crawler._auto_scan_loop uses time.time()-based next_run_ts with 15s tick; acceptable but drifts a few seconds — fine for MVP.",
+    "SettingsPanel save() sends Math.max(5, ...) clamp for interval, which silently overwrites low user inputs without visual feedback. Consider a helper text or validation message.",
+    "AutoScanCard uses new Date(iso).toLocaleString('vi-VN'); for null last_run shows em dash — good."
+  ],
+  "updated_files": ["/app/backend/tests/test_auto_scan.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "None - reused existing novels. Temporarily toggled auto_scan settings during tests then restored to defaults (false/0/3/60).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests at /app/backend/tests/test_auto_scan.py cover the auto-scan feature comprehensively. Site rate-limits chapter crawling via Turnstile; do NOT expect new-novel chapter counts to grow during a test window. The 400 'Đang quét truyện mới rồi' conflict is race-condition dependent — treated as best-effort. wtr-lab.com page fetch takes ~5s per page so scan-new completes in ~10-20s for 2 pages."
+}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { api, STATUS_META } from "@/lib/api";
+import AutoScanCard from "@/components/AutoScanCard";
 
 const Stat = ({ icon: Icon, label, value, tone, testid }) => (
   <div className="card-surface rounded-xl p-4 relative overflow-hidden" data-testid={testid}>
@@ -20,12 +21,14 @@ const Stat = ({ icon: Icon, label, value, tone, testid }) => (
 export default function Dashboard({ stats, status, onChange, setTab }) {
   const [logs, setLogs] = useState([]);
   const [pages, setPages] = useState("");
+  const [settings, setSettings] = useState(null);
   const en = status.enumerate || {};
 
   const loadLogs = async () => {
     try { setLogs(await api.logs({ limit: 8 })); } catch (e) {}
   };
   useEffect(() => { loadLogs(); const t = setInterval(loadLogs, 3000); return () => clearInterval(t); }, []);
+  useEffect(() => { api.settings().then(setSettings).catch(() => {}); }, [status.auto_scan?.last_run]);
 
   const runEnumerate = async () => {
     try {
@@ -96,6 +99,8 @@ export default function Dashboard({ stats, status, onChange, setTab }) {
           </div>
         )}
       </div>
+
+      <AutoScanCard status={status} settings={settings} onChange={onChange} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* status breakdown */}

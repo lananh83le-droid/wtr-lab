@@ -38,7 +38,7 @@ def decrypt_body(encrypted):
 
 
 def make_client(proxy=None):
-    return httpx.AsyncClient(headers=HEADERS, timeout=60.0, proxy=proxy, follow_redirects=True)
+    return httpx.AsyncClient(headers=HEADERS, timeout=20.0 if proxy else 60.0, proxy=proxy, follow_redirects=True)
 
 
 async def get_build_id(proxy=None):

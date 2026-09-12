@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
+import ProxyTools from "@/components/ProxyTools";
 
 const STATUS_ICON = {
   alive: { icon: CircleCheck, cls: "text-emerald-400" },
@@ -14,17 +15,20 @@ const STATUS_ICON = {
 
 export default function ProxyManager() {
   const [proxies, setProxies] = useState([]);
+  const [summary, setSummary] = useState({});
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
   const [testing, setTesting] = useState({});
 
-  const load = async () => { try { setProxies(await api.proxies()); } catch (e) {} };
-  useEffect(() => { load(); }, []);
+  const load = async () => {
+    try { const [p, s] = await Promise.all([api.proxies(), api.proxySummary()]); setProxies(p); setSummary(s); } catch (e) {}
+  };
+  useEffect(() => { load(); const t = setInterval(load, 3000); return () => clearInterval(t); }, []);
 
   const add = async () => {
     if (!url.trim()) return;
     try { await api.addProxy(url.trim(), label.trim()); toast.success("Đã thêm proxy"); setUrl(""); setLabel(""); load(); }
-    catch (e) { toast.error("Không thể thêm proxy"); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Không thể thêm proxy"); }
   };
   const del = async (id) => { await api.deleteProxy(id); toast.success("Đã xoá"); load(); };
   const toggle = async (id) => { await api.toggleProxy(id); load(); };
@@ -39,8 +43,10 @@ export default function ProxyManager() {
     <div className="space-y-5" data-testid="proxies-tab">
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight">Quản lý Proxy</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Xoay vòng IP để crawl nhanh và tránh bị chặn (Cloudflare Turnstile). Hỗ trợ HTTP/SOCKS5.</p>
+        <p className="text-sm text-slate-400 mt-0.5">Xoay vòng IP thông minh (ưu tiên proxy nhanh, tự tắt proxy lỗi) để crawl nhanh và tránh Cloudflare Turnstile. Hỗ trợ HTTP/SOCKS5.</p>
       </div>
+
+      <ProxyTools summary={summary} onChange={load} />
 
       <div className="card-surface rounded-xl p-4">
         <div className="flex flex-col sm:flex-row gap-2">
@@ -65,11 +71,13 @@ export default function ProxyManager() {
               <th className="text-left px-3 py-3 font-medium">Proxy</th>
               <th className="text-left px-3 py-3 font-medium">Trạng thái</th>
               <th className="text-left px-3 py-3 font-medium">Độ trễ</th>
+              <th className="text-left px-3 py-3 font-medium">Lỗi</th>
+              <th className="text-left px-3 py-3 font-medium">Nguồn</th>
               <th className="text-right px-4 py-3 font-medium">Hành động</th>
             </tr>
           </thead>
           <tbody>
-            {proxies.length === 0 && <tr><td colSpan={5} className="text-center py-12 text-slate-500">Chưa có proxy nào.</td></tr>}
+            {proxies.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-slate-500">Chưa có proxy nào.</td></tr>}
             {proxies.map((p, i) => {
               const S = STATUS_ICON[p.status] || STATUS_ICON.unknown;
               const Icon = S.icon;
@@ -82,6 +90,8 @@ export default function ProxyManager() {
                   </td>
                   <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 text-xs ${S.cls}`}><Icon className="h-4 w-4" />{p.status}</span></td>
                   <td className="px-3 py-3 mono text-xs text-slate-400">{p.latency != null ? `${p.latency} ms` : "—"}</td>
+                  <td className="px-3 py-3 mono text-xs text-slate-400">{p.fail_count || 0}</td>
+                  <td className="px-3 py-3 text-[11px] text-slate-500">{p.source === "auto" ? "tự động" : p.source === "bulk" ? "hàng loạt" : "thủ công"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
                       <Button data-testid={`proxy-test-${i}`} size="sm" variant="outline" disabled={testing[p.id]}

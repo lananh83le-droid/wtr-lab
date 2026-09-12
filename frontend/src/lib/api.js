@@ -12,6 +12,7 @@ export const api = {
   pause: () => http.post("/crawl/pause").then((r) => r.data),
   enumerate: (max_pages) => http.post("/crawl/enumerate", { max_pages }).then((r) => r.data),
   enumerateStop: () => http.post("/crawl/enumerate/stop").then((r) => r.data),
+  scanNew: (pages) => http.post("/crawl/scan-new", { pages }).then((r) => r.data),
 
   novels: (params) => http.get("/novels", { params }).then((r) => r.data),
   addNovel: (url, priority = 0) => http.post("/novels/add", { url, priority }).then((r) => r.data),
@@ -27,6 +28,11 @@ export const api = {
   exportAllUrl: (fmt) => `${API}/export/all?fmt=${fmt}`,
 
   proxies: () => http.get("/proxies").then((r) => r.data),
+  proxySummary: () => http.get("/proxies/summary").then((r) => r.data),
+  bulkProxies: (text, default_scheme = "http") => http.post("/proxies/bulk", { text, default_scheme }).then((r) => r.data),
+  harvestProxies: (max_pool) => http.post("/proxies/harvest", { max_pool }).then((r) => r.data),
+  recheckProxies: () => http.post("/proxies/recheck").then((r) => r.data),
+  purgeDeadProxies: () => http.delete("/proxies/dead").then((r) => r.data),
   addProxy: (url, label) => http.post("/proxies", { url, label }).then((r) => r.data),
   deleteProxy: (id) => http.delete(`/proxies/${id}`).then((r) => r.data),
   toggleProxy: (id) => http.post(`/proxies/${id}/toggle`).then((r) => r.data),
