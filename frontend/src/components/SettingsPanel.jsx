@@ -11,7 +11,7 @@ export default function SettingsPanel() {
   const [s, setS] = useState({
     concurrency: 3, delay_ms: 300, use_proxy: false,
     auto_scan_enabled: false, auto_scan_interval_min: 60, auto_scan_pages: 3, chapter_limit: 0,
-    parallel_novels: 1, proxy_auto_harvest: false, proxy_max_pool: 200,
+    parallel_novels: 1, proxy_auto_harvest: true, proxy_max_pool: 400, auto_queue_new: true,
   });
 
   useEffect(() => { api.settings().then(setS).catch(() => {}); }, []);
@@ -24,8 +24,8 @@ export default function SettingsPanel() {
         auto_scan_interval_min: Math.max(5, Number(s.auto_scan_interval_min) || 60),
         auto_scan_pages: Math.max(1, Number(s.auto_scan_pages) || 3),
         chapter_limit: Math.max(0, Number(s.chapter_limit) || 0),
-        parallel_novels: Math.min(20, Math.max(1, Number(s.parallel_novels) || 1)),
-        proxy_auto_harvest: !!s.proxy_auto_harvest,
+        parallel_novels: Math.min(30, Math.max(1, Number(s.parallel_novels) || 1)),
+        proxy_auto_harvest: !!s.proxy_auto_harvest, auto_queue_new: !!s.auto_queue_new,
         proxy_max_pool: Math.max(10, Number(s.proxy_max_pool) || 200),
       });
       setS(saved);
@@ -47,9 +47,9 @@ export default function SettingsPanel() {
             <label className="text-sm font-medium">Số luồng đồng thời (concurrency)</label>
             <span className="ml-auto mono text-cyan-300 text-sm">{s.concurrency}</span>
           </div>
-          <Slider data-testid="concurrency-slider" value={[Number(s.concurrency)]} min={1} max={50} step={1}
+          <Slider data-testid="concurrency-slider" value={[Number(s.concurrency)]} min={1} max={100} step={1}
             onValueChange={([v]) => setS({ ...s, concurrency: v })} />
-          <p className="text-xs text-slate-500 mt-1.5">Số chương tải song song trong 1 truyện. Không proxy: nên để 3. Có proxy pool: 10–30.</p>
+          <p className="text-xs text-slate-500 mt-1.5">Số chương tải song song trong 1 truyện. Không proxy: nên để 3. Có proxy pool: 20–50.</p>
         </div>
 
         <div>
@@ -58,7 +58,7 @@ export default function SettingsPanel() {
             <label className="text-sm font-medium">Số truyện crawl song song</label>
             <span className="ml-auto mono text-amber-300 text-sm">{s.parallel_novels}</span>
           </div>
-          <Slider data-testid="parallel-novels-slider" value={[Number(s.parallel_novels) || 1]} min={1} max={20} step={1}
+          <Slider data-testid="parallel-novels-slider" value={[Number(s.parallel_novels) || 1]} min={1} max={30} step={1}
             onValueChange={([v]) => setS({ ...s, parallel_novels: v })} />
           <p className="text-xs text-slate-500 mt-1.5">Tổng request đồng thời ≈ số truyện × số luồng. Chỉ nên tăng khi đã có proxy pool.</p>
         </div>
@@ -90,7 +90,7 @@ export default function SettingsPanel() {
               <Wand2 className="h-4 w-4 text-emerald-300" />
               <div>
                 <div className="text-sm font-medium">Tự động duy trì pool proxy</div>
-                <div className="text-xs text-slate-500">Mỗi 20 phút: kiểm tra lại toàn bộ, tắt proxy chết và tự thu thập proxy miễn phí mới cho đủ pool</div>
+                <div className="text-xs text-slate-500">Liên tục: thu thập proxy miễn phí khi pool thiếu, kiểm tra lại mỗi 10 phút, tự tắt proxy chết, tự xếp lại truyện còn chương chờ</div>
               </div>
             </div>
             <Switch data-testid="proxy-auto-harvest-switch" checked={!!s.proxy_auto_harvest}
@@ -105,6 +105,18 @@ export default function SettingsPanel() {
         </div>
 
         <div className="rounded-lg bg-black/30 border border-white/8 p-4 space-y-4" data-testid="auto-scan-settings">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Layers className="h-4 w-4 text-cyan-300" />
+              <div>
+                <div className="text-sm font-medium">Tự động nạp hàng đợi</div>
+                <div className="text-xs text-slate-500">Khi hàng đợi trống: xếp lại truyện còn chương chờ, rồi tự đưa truyện "Mới" (chưa crawl) vào hàng đợi</div>
+              </div>
+            </div>
+            <Switch data-testid="auto-queue-new-switch" checked={!!s.auto_queue_new}
+              onCheckedChange={(v) => setS({ ...s, auto_queue_new: v })} />
+          </div>
+          <div className="h-px bg-white/8" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Sparkles className="h-4 w-4 text-emerald-300" />

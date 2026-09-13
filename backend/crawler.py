@@ -52,8 +52,9 @@ class CrawlManager:
         s.setdefault("auto_scan_pages", 3)
         s.setdefault("chapter_limit", 0)
         s.setdefault("parallel_novels", 1)
-        s.setdefault("proxy_auto_harvest", False)
-        s.setdefault("proxy_max_pool", 200)
+        s.setdefault("proxy_auto_harvest", True)
+        s.setdefault("proxy_max_pool", 400)
+        s.setdefault("auto_queue_new", True)
         s.setdefault("proxy_kinds", ["http", "socks5"])
         return s
 
@@ -246,16 +247,17 @@ class CrawlManager:
         proxy = None
         try:
             proxy = await self.pick_proxy() if use_proxy else None
+            t0 = time.time()
             res = await asyncio.wait_for(
                 wtrlab.get_chapter(ch["raw_id"], ch["chapter_order"], ch["chapter_id"], proxy),
-                30 if proxy else 75)
+                20 if proxy else 75)
             content = "\n".join(res["lines"])
             await self.db.chapters.update_one({"id": ch["id"]}, {"$set": {
                 "body": res["lines"], "content": content, "title_zh_full": res.get("title", ""),
                 "word_count": len(content), "status": "done", "error": None, "crawled_at": now_iso(),
             }})
             self._mark_done()
-            await self.pool.report(proxy, True)
+            await self.pool.report(proxy, True, int((time.time() - t0) * 1000))
             return True
         except Exception as e:
             msg = str(e)
@@ -412,19 +414,51 @@ class CrawlManager:
                 if s.get("auto_scan_enabled") else None,
             })
 
-    # ---------- proxy pool maintenance ----------
+    # ---------- proxy pool maintenance (continuous) ----------
     async def _proxy_maintenance_loop(self):
-        last = 0.0
+        last_recheck = last_purge = last_requeue = 0.0
         while True:
             try:
                 s = await self.get_settings()
-                if s.get("proxy_auto_harvest") and time.time() - last > 20 * 60 and not self.pool.harvest["running"]:
-                    last = time.time()
-                    await self.pool.recheck_all(self.log)
+                now = time.time()
+                if s.get("proxy_auto_harvest"):
+                    max_pool = int(s.get("proxy_max_pool") or 400)
                     alive = await self.db.proxies.count_documents({"enabled": True, "status": "alive"})
-                    if alive < int(s.get("proxy_max_pool") or 200):
-                        self.pool.start_harvest(s.get("proxy_kinds") or ["http", "socks5"],
-                                                s.get("proxy_max_pool") or 200, self.log)
+                    if alive < max_pool * 0.9 and not self.pool.harvest["running"]:
+                        self.pool.start_harvest(s.get("proxy_kinds") or ["http", "socks5"], max_pool, self.log)
+                    if now - last_recheck > 10 * 60 and not self.pool.harvest["running"]:
+                        last_recheck = now
+                        await self.pool.recheck_all(self.log, only_enabled=True)
+                    if now - last_purge > 60 * 60:
+                        last_purge = now
+                        n = await self.pool.purge_dead(older_than_sec=6 * 3600)
+                        if n:
+                            await self.log("INFO", f"Đã dọn {n} proxy chết cũ")
+                if self.running and now - last_requeue > 60:
+                    last_requeue = now
+                    await self._requeue_partial()
             except Exception as e:
                 await self.log("ERROR", f"Proxy maintenance: {e}")
             await asyncio.sleep(30)
+
+    async def _requeue_partial(self):
+        """Fully automatic: requeue partial novels with pending chapters, then feed 'new' novels."""
+        if await self.db.novels.count_documents({"status": "queued"}, limit=1):
+            return
+        ids = await self.db.chapters.distinct("novel_id", {"status": "pending"})
+        if ids:
+            r = await self.db.novels.update_many(
+                {"id": {"$in": ids}, "status": "partial"}, {"$set": {"status": "queued", "updated_at": now_iso()}})
+            if r.modified_count:
+                await self.log("INFO", f"Tự động xếp lại {r.modified_count} truyện còn chương chờ vào hàng đợi")
+                return
+        s = await self.get_settings()
+        if not s.get("auto_queue_new"):
+            return
+        batch = max(1, int(s.get("parallel_novels") or 1)) * 3
+        new_ids = [n["id"] for n in await self.db.novels.find(
+            {"status": "new"}, {"_id": 0, "id": 1}).sort("created_at", 1).limit(batch).to_list(batch)]
+        if new_ids:
+            await self.db.novels.update_many(
+                {"id": {"$in": new_ids}}, {"$set": {"status": "queued", "updated_at": now_iso()}})
+            await self.log("INFO", f"Tự động đưa {len(new_ids)} truyện mới vào hàng đợi")

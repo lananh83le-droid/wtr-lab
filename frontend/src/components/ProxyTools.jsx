@@ -55,7 +55,7 @@ export default function ProxyTools({ summary, onChange }) {
           <Wand2 className={`h-4 w-4 text-emerald-300 ${h.running ? "animate-pulse" : ""}`} />
           <div className="font-display font-semibold text-sm">Tự động lấy proxy miễn phí</div>
         </div>
-        <p className="text-xs text-slate-500">Tải HTTP + SOCKS5 từ TheSpeedX / proxifly / monosans / proxyscrape, test trực tiếp với wtr-lab.com, chỉ giữ proxy sống.</p>
+        <p className="text-xs text-slate-500">Tải HTTP + SOCKS5 từ {h.sources || 70}+ nguồn công khai (TheSpeedX, proxifly, monosans, jetkai, yakumo…), test trực tiếp với wtr-lab.com, chỉ giữ proxy sống. Đã chạy {h.runs || 0} lượt.</p>
         <div className="grid grid-cols-4 gap-2">
           <Pill testid="proxy-pill-total" label="Tổng" value={summary.total ?? 0} cls="border-white/10 bg-black/30 text-slate-200" />
           <Pill testid="proxy-pill-alive" label="Sống" value={summary.alive ?? 0} cls="border-emerald-500/30 bg-emerald-500/10 text-emerald-300" />
@@ -65,7 +65,7 @@ export default function ProxyTools({ summary, onChange }) {
         {h.running && (
           <div data-testid="proxy-harvest-progress">
             <div className="flex justify-between text-xs mono text-slate-400 mb-1">
-              <span>{h.phase === "fetch" ? "Đang tải danh sách…" : `Đã test ${h.tested}/${h.fetched} · sống ${h.alive}`}</span>
+              <span>{h.phase === "fetch" ? `Tầng ${h.tier}: đang tải danh sách…` : `Tầng ${h.tier} · đã test ${h.tested}/${h.fetched} · sống ${h.alive}`}</span>
               <span>+{h.added}</span>
             </div>
             <Progress value={h.fetched ? (h.tested / h.fetched) * 100 : 5} className="h-1.5 bg-white/5" />

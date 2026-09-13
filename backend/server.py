@@ -62,6 +62,7 @@ class SettingsReq(BaseModel):
     proxy_auto_harvest: Optional[bool] = None
     proxy_max_pool: Optional[int] = None
     proxy_kinds: Optional[list] = None
+    auto_queue_new: Optional[bool] = None
 
 
 class BulkProxyReq(BaseModel):

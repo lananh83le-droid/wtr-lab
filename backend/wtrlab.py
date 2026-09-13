@@ -1,5 +1,7 @@
 """Low-level async client for wtr-lab.com (reverse-engineered public API)."""
+import asyncio
 import base64
+import contextlib
 import json
 import re
 import httpx
@@ -37,8 +39,30 @@ def decrypt_body(encrypted):
     return json.loads(plaintext) if is_array else plaintext
 
 
+_CLIENTS = {}
+_LIMITS = httpx.Limits(max_connections=200, max_keepalive_connections=50)
+SSL_CTX = httpx.create_ssl_context()  # shared: building an SSL context per client blocks the event loop
+
+
 def make_client(proxy=None):
-    return httpx.AsyncClient(headers=HEADERS, timeout=20.0 if proxy else 60.0, proxy=proxy, follow_redirects=True)
+    """Persistent keep-alive client per proxy (wrapped so `async with` still works)."""
+    key = proxy or "direct"
+    c = _CLIENTS.get(key)
+    if c is None or c.is_closed:
+        if len(_CLIENTS) > 1500:
+            for k in list(_CLIENTS)[:500]:
+                old = _CLIENTS.pop(k)
+                asyncio.ensure_future(old.aclose())
+        c = httpx.AsyncClient(headers=HEADERS, timeout=15.0 if proxy else 60.0, proxy=proxy,
+                              follow_redirects=True, limits=_LIMITS, verify=SSL_CTX)
+        _CLIENTS[key] = c
+    return contextlib.nullcontext(c)
+
+
+async def drop_client(proxy):
+    c = _CLIENTS.pop(proxy or "direct", None)
+    if c is not None:
+        await c.aclose()
 
 
 async def get_build_id(proxy=None):

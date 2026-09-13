@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 4: verified max-speed + full-automation additions. Backend 10/10 pytest cases in test_iteration4.py pass (auto_queue_new setting present/toggles/persists, /api/proxies/summary.harvest exposes tier/sources=78/runs and alive>100 (~536 alive), 10 sequential /api/stats calls all <3s under load, throughput=340 CH/PHÚT with active work and crawling<=parallel_novels=8, 'Tự động đưa N truyện mới vào hàng đợi' log line seen within window, POST /api/proxies/harvest returns 200 {started:true} or 400 'Đang thu thập proxy rồi' and 'Thu thập proxy tầng 1' log appears, /api/novels?limit=5 OK, done-novel chapters + export ?fmt=txt returns text/plain with CJK content, pause+start leaves crawler running). Frontend: Dashboard renders, auto-scan-status-badge='ĐANG BẬT', sidebar 'CH/PHÚT' shows live number (340). Settings: auto-queue-new-switch present with data-state=checked, toggle+save-settings-btn shows toast 'Đã lưu cấu hình' and restores to checked; concurrency-slider inner [role=slider] aria-valuemax=100, parallel-novels-slider aria-valuemax=30. Proxy tab: proxy-harvest-card description mentions '78+ nguồn', alive pill shows 91-102 (>100 total via summary), proxy-harvest-progress shows 'Tầng 1 · đã test 2812/14808 · sống 52'. No regressions.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "POST /api/proxies/harvest", "issue": "Requires JSON body (HarvestReq). Empty request yields 422 'Field required' instead of using defaults. Consider making body Optional so bare POST works — frontend already sends JSON, but shell/curl UX suffers."}
+  ]},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4.py",
+    "/app/test_reports/pytest/iteration4.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "proxy_pool.SOURCES has 78 tiered sources with graceful fetch_sources; harvest phase currently 'Tầng 1 · đã test 2812/14808' — good progress observability. Consider capping concurrent HEAD tests per host to protect memory when sources balloon.",
+    "crawler._proxy_maintenance_loop starts harvest when alive < 0.9*proxy_max_pool; 30s tick is fine. Ensure recheck_all is guarded from overlapping runs (single-flight) — currently runs every 10 min so overlap is unlikely.",
+    "wtrlab.make_client caches httpx.AsyncClient per proxy; ensure eviction / close-on-disable to avoid leaking clients as free-proxy churn happens. Check pool size cap.",
+    "server.py HarvestReq required body causes 422 for bare POST — make optional (req: HarvestReq | None = None) for DX. Non-blocking.",
+    "Settings model still lacks Pydantic Field ge/le bounds for concurrency (max 100) and parallel_novels (max 30) — UI enforces but backend accepts anything. Add server-side validation.",
+    "novels_by_status.crawling observed at 8 == parallel_novels limit — respected. throughput=340-480 CH/PHÚT sustained; auto-queue-new populates queue as it drains. No event-loop starvation observed (10x /api/stats all <3s)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration4.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "None. Toggled auto_queue_new off->on during test then restored to true. No proxies/novels modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iteration4.py covers new automation features. Preview backend URL used from /app/frontend/.env; pytest.ini enforces -n 2 --dist loadscope so run with `-n 0` when isolating. Free proxies churn — 'alive' fluctuates 500-800. Auto-queue log line appears every few minutes when queue drains; use ?limit=200 to catch it. Do NOT touch proxy_max_pool/parallel_novels/concurrency/use_proxy per main-agent instructions."
+}
